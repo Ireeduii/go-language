@@ -1,0 +1,9 @@
+# Executables
+*.exe
+*.exe.stackdump
+*.out
+go-backend
+
+# Environment / System files
+.DS_Store
+.vscode/
