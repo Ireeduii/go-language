@@ -6,59 +6,39 @@ import (
 	"net/http"
 )
 
-type User struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-	Role string `json:"role"`
-}
-
-// Туршилтын санах ой (In-memory database)
-var users = []User{
-	{ID: 1, Name: "Bat-Ireedui", Role: "Developer"},
-	{ID: 2, Name: "Anand", Role: "Designer"},
+// PHP API-аас ирэх Task-ийн бүтэц
+type Task struct {
+	ID     int    `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"`
 }
 
 func main() {
-	// API routes
-	http.HandleFunc("/api/users", handleUsers)
+	http.HandleFunc("/api/php-tasks", getTasksFromPHP)
 
 	fmt.Println("🚀 Go Server ажиллаж байна: http://localhost:8080")
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		fmt.Println("Сервер асахад алдаа гарлаа:", err)
-	}
+	http.ListenAndServe(":8080", nil)
 }
 
-func handleUsers(w http.ResponseWriter, r *http.Request) {
+func getTasksFromPHP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// 1. GET хүсэлт ирвэл жагсаалтаа буцаана
-	if r.Method == http.MethodGet {
-		json.NewEncoder(w).Encode(users)
+	// 1. PHP API руу GET хүсэлт илгээнэ
+	resp, err := http.Get("http://localhost/php-api/tasks.php")
+	if err != nil {
+		http.Error(w, "PHP API-тай холбогдож чадсангүй", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	// 2. Ирсэн JSON-ийг Go-ийн struct руу уншина
+	var tasks []Task
+	err = json.NewDecoder(resp.Body).Decode(&tasks)
+	if err != nil {
+		http.Error(w, "JSON уншихад алдаа гарлаа", http.StatusInternalServerError)
 		return
 	}
 
-	// 2. POST хүсэлт ирвэл шинэ хэрэглэгч нэмнэ
-	if r.Method == http.MethodPost {
-		var newUser User
-
-		// Хэрэглэгчийн явуулсан JSON-ийг уншиж newUser уруу хөрвүүлнэ
-		err := json.NewDecoder(r.Body).Decode(&newUser)
-		if err != nil {
-			http.Error(w, "Буруу JSON өгөгдөл байна", http.StatusBadRequest)
-			return
-		}
-
-		// Шинэ ID олгоод array руугаа нэмнэ
-		newUser.ID = len(users) + 1
-		users = append(users, newUser)
-
-		// Амжилттай нэмэгдсэнийг буцаана (Status 201 Created)
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(newUser)
-		return
-	}
-
-	// GET болон POST-оос бусад хүсэлтэнд алдаа буцаана
-	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	// 3. Уншсан датагаа буцаана
+	json.NewEncoder(w).Encode(tasks)
 }
